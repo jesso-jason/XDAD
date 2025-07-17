@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>双人排球小游戏</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#3B82F6',
+                        secondary: '#10B981',
+                        accent: '#F59E0B',
+                        dark: '#1E293B',
+                        light: '#F8FAFC'
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .content-auto {
+                content-visibility: auto;
+            }
+            .game-shadow {
+                box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+            }
+            .paddle-shadow {
+                box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            }
+            .ball-shadow {
+                box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            }
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen flex flex-col items-center justify-center p-4 font-sans">
+    <div class="max-w-4xl w-full bg-white rounded-xl p-6 md:p-8 game-shadow">
+        <header class="mb-6 text-center">
+            <h1 class="text-[clamp(1.8rem,5vw,2.5rem)] font-bold text-dark mb-2">双人排球小游戏</h1>
+            <p class="text-gray-600">玩家1: WASD控制 | 玩家2: IJKL控制</p>
+        </header>
+        
+        <div class="relative">
+            <div class="flex flex-col md:flex-row gap-4 mb-4">
+                <div class="flex-1 bg-blue-50 rounded-lg p-4 text-center">
+                    <h2 class="font-bold text-primary mb-2">玩家1</h2>
+                    <p class="text-2xl font-bold" id="player1-score">0</p>
+                    <div class="mt-2 text-sm text-gray-600">
+                        <span class="mr-2"><i class="fa fa-arrow-up"></i> W</span>
+                        <span class="mr-2"><i class="fa fa-arrow-left"></i> A</span>
+                        <span class="mr-2"><i class="fa fa-arrow-down"></i> S</span>
+                        <span class="mr-2"><i class="fa fa-arrow-right"></i> D</span>
+                    </div>
+                </div>
+                
+                <div class="flex-1 bg-green-50 rounded-lg p-4 text-center">
+                    <h2 class="font-bold text-secondary mb-2">玩家2</h2>
+                    <p class="text-2xl font-bold" id="player2-score">0</p>
+                    <div class="mt-2 text-sm text-gray-600">
+                        <span class="mr-2"><i class="fa fa-arrow-up"></i> I</span>
+                        <span class="mr-2"><i class="fa fa-arrow-left"></i> J</span>
+                        <span class="mr-2"><i class="fa fa-arrow-down"></i> K</span>
+                        <span class="mr-2"><i class="fa fa-arrow-right"></i> L</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="relative aspect-[4/3] bg-gradient-to-b from-blue-400/30 to-blue-500/30 rounded-lg overflow-hidden border-2 border-primary/50" id="game-container">
+                <canvas id="gameCanvas" class="w-full h-full"></canvas>
+                
+                <div id="start-screen" class="absolute inset-0 flex flex-col items-center justify-center bg-dark/80 text-white z-10">
+                    <h2 class="text-3xl font-bold mb-4">准备开始!</h2>
+                    <p class="mb-6 text-center px-4">玩家1: WASD控制 | 玩家2: IJKL控制</p>
+                    <button id="start-button" class="bg-primary hover:bg-primary/80 text-white font-bold py-3 px-8 rounded-full transition-all duration-300 transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-primary/50">
+                        开始游戏
+                    </button>
+                </div>
+                
+                <div id="game-over" class="absolute inset-0 flex-col items-center justify-center bg-dark/80 text-white z-10 hidden">
+                    <h2 class="text-3xl font-bold mb-2" id="winner-text"></h2>
+                    <p class="text-xl mb-6">最终比分: <span id="final-score">0 - 0</span></p>
+                    <button id="restart-button" class="bg-accent hover:bg-accent/80 text-white font-bold py-3 px-8 rounded-full transition-all duration-300 transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-accent/50">
+                        再来一局
+                    </button>
+                </div>
+            </div>
+            
+            <div class="mt-4 flex flex-wrap justify-between items-center gap-4">
+                <div class="flex items-center gap-2">
+                    <span class="text-sm text-gray-600">游戏速度:</span>
+                    <input type="range" id="speed-control" min="1" max="10" value="5" class="w-32 accent-primary">
+                    <span id="speed-value" class="text-sm font-medium">5</span>
+                </div>
+                
+                <div class="flex items-center gap-2">
+                    <span class="text-sm text-gray-600">目标分数:</span>
+                    <select id="score-limit" class="border border-gray-300 rounded-md px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50">
+                        <option value="5">5</option>
+                        <option value="10" selected>10</option>
+                        <option value="15">15</option>
+                        <option value="21">21</option>
+                    </select>
+                </div>
+                
+                <button id="pause-button" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium py-2 px-4 rounded-md transition-colors duration-200 flex items-center gap-1">
+                    <i class="fa fa-pause"></i> 暂停
+                </button>
+            </div>
+        </div>
+        
+        <div class="mt-6 bg-gray-50 rounded-lg p-4">
+            <h3 class="font-bold text-dark mb-2">游戏说明</h3>
+            <ul class="text-sm text-gray-600 space-y-1">
+                <li><i class="fa fa-check-circle text-primary mr-1"></i> 玩家1使用WASD控制蓝色挡板</li>
+                <li><i class="fa fa-check-circle text-secondary mr-1"></i> 玩家2使用IJKL控制绿色挡板</li>
+                <li><i class="fa fa-check-circle text-accent mr-1"></i> 将球击过中间的网，使球落在对方场地得分</li>
+                <li><i class="fa fa-check-circle text-gray-500 mr-1"></i> 球碰到边界会反弹，但不能出界</li>
+            </ul>
+        </div>
+    </div>
+    
+    <footer class="mt-8 text-center text-gray-500 text-sm">
+        <p>© 2025 双人排球小游戏 | 使用键盘控制</p>
+    </footer>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // 获取DOM元素
+            const canvas = document.getElementById('gameCanvas');
+            const ctx = canvas.getContext('2d');
+            const gameContainer = document.getElementById('game-container');
+            const startScreen = document.getElementById('start-screen');
+            const gameOverScreen = document.getElementById('game-over');
+            const winnerText = document.getElementById('winner-text');
+            const finalScoreText = document.getElementById('final-score');
+            const startButton = document.getElementById('start-button');
+            const restartButton = document.getElementById('restart-button');
+            const pauseButton = document.getElementById('pause-button');
+            const player1ScoreEl = document.getElementById('player1-score');
+            const player2ScoreEl = document.getElementById('player2-score');
+            const speedControl = document.getElementById('speed-control');
+            const speedValue = document.getElementById('speed-value');
+            const scoreLimitSelect = document.getElementById('score-limit');
+            
+            // 游戏状态
+            let gameRunning = false;
+            let gamePaused = false;
+            let animationId = null;
+            let lastTime = 0;
+            let scoreLimit = 10;
+            
+            // 游戏配置
+            const config = {
+                speedMultiplier: 5,
+                paddleSpeed: 5,
+                ballSpeed: 4,
+                maxBallSpeed: 10,
+                ballAcceleration: 0.1,
+                netWidth: 4,
+                netHeight: 20,
+                paddleWidth: 80,
+                paddleHeight: 15,
+                ballRadius: 10
+            };
+            
+            // 玩家控制状态
+            const keys = {
+                w: false, a: false, s: false, d: false,
+                i: false, j: false, k: false, l: false
+            };
+            
+            // 游戏对象
+            const player1 = {
+                x: 0,
+                y: 0,
+                width: config.paddleWidth,
+                height: config.paddleHeight,
+                color: '#3B82F6',
+                score: 0
+            };
+            
+            const player2 = {
+                x: 0,
+                y: 0,
+                width: config.paddleWidth,
+                height: config.paddleHeight,
+                color: '#10B981',
+                score: 0
+            };
+            
+            const ball = {
+                x: 0,
+                y: 0,
+                radius: config.ballRadius,
+                color: '#F59E0B',
+                dx: 0,
+                dy: 0,
+                speed: config.ballSpeed
+            };
+            
+            // 初始化游戏
+            function initGame() {
+                // 设置Canvas尺寸
+                resizeCanvas();
+                
+                // 初始化玩家位置
+                player1.x = (canvas.width - player1.width) / 2;
+                player1.y = canvas.height - player1.height - 30;
+                
+                player2.x = (canvas.width - player2.width) / 2;
+                player2.y = 30;
+                
+                // 初始化球位置和速度
+                resetBall();
+                
+                // 更新分数显示
+                updateScoreDisplay();
+            }
+            
+            // 重置球
+            function resetBall() {
+                ball.x = canvas.width / 2;
+                ball.y = canvas.height / 2;
+                
+                // 随机初始方向
+                const angle = (Math.random() * Math.PI / 2) + Math.PI / 4; // 45-135度
+                const direction = Math.random() < 0.5 ? 1 : -1;
+                
+                ball.dx = Math.cos(angle) * ball.speed * direction;
+                ball.dy = Math.sin(angle) * ball.speed;
+            }
+            
+            // 调整Canvas尺寸
+            function resizeCanvas() {
+                const containerRect = gameContainer.getBoundingClientRect();
+                canvas.width = containerRect.width;
+                canvas.height = containerRect.height;
+            }
+            
+            // 更新游戏状态
+            function update(deltaTime) {
+                if (gamePaused) return;
+                
+                // 应用速度乘数
+                const speedFactor = config.speedMultiplier / 5;
+                const moveAmount = config.paddleSpeed * speedFactor * deltaTime;
+                const ballSpeedFactor = speedFactor;
+                
+                // 玩家1控制 (WASD)
+                if (keys.w && player1.y > 0) {
+                    player1.y -= moveAmount;
+                }
+                if (keys.s && player1.y < canvas.height - player1.height) {
+                    player1.y += moveAmount;
+                }
+                if (keys.a && player1.x > 0) {
+                    player1.x -= moveAmount;
+                }
+                if (keys.d && player1.x < canvas.width - player1.width) {
+                    player1.x += moveAmount;
+                }
+                
+                // 玩家2控制 (IJKL)
+                if (keys.i && player2.y > 0) {
+                    player2.y -= moveAmount;
+                }
+                if (keys.k && player2.y < canvas.height - player2.height) {
+                    player2.y += moveAmount;
+                }
+                if (keys.j && player2.x > 0) {
+                    player2.x -= moveAmount;
+                }
+                if (keys.l && player2.x < canvas.width - player2.width) {
+                    player2.x += moveAmount;
+                }
+                
+                // 更新球位置
+                ball.x += ball.dx * ballSpeedFactor;
+                ball.y += ball.dy * ballSpeedFactor;
+                
+                // 检测墙壁碰撞
+                if (ball.x - ball.radius < 0 || ball.x + ball.radius > canvas.width) {
+                    ball.dx = -ball.dx;
+                    
+                    // 确保球不会卡在墙壁内
+                    if (ball.x - ball.radius < 0) {
+                        ball.x = ball.radius;
+                    } else if (ball.x + ball.radius > canvas.width) {
+                        ball.x = canvas.width - ball.radius;
+                    }
+                }
+                
+                // 检测得分
+                if (ball.y - ball.radius < 0) {
+                    // 玩家1得分
+                    player1.score++;
+                    updateScoreDisplay();
+                    resetBall();
+                    checkGameOver();
+                } else if (ball.y + ball.radius > canvas.height) {
+                    // 玩家2得分
+                    player2.score++;
+                    updateScoreDisplay();
+                    resetBall();
+                    checkGameOver();
+                }
+                
+                // 检测挡板碰撞
+                if (isColliding(ball, player1)) {
+                    // 从底部碰撞
+                    ball.dy = -Math.abs(ball.dy);
+                    ball.y = player1.y - ball.radius;
+                    applyBounceEffect(player1);
+                } else if (isColliding(ball, player2)) {
+                    // 从顶部碰撞
+                    ball.dy = Math.abs(ball.dy);
+                    ball.y = player2.y + player2.height + ball.radius;
+                    applyBounceEffect(player2);
+                }
+            }
+            
+            // 检测碰撞
+            function isColliding(ball, paddle) {
+                return (
+                    ball.x + ball.radius > paddle.x &&
+                    ball.x - ball.radius < paddle.x + paddle.width &&
+                    ball.y + ball.radius > paddle.y &&
+                    ball.y - ball.radius < paddle.y + paddle.height
+                );
+            }
+            
+            // 应用反弹效果
+            function applyBounceEffect(paddle) {
+                // 增加球速
+                ball.speed = Math.min(ball.speed + config.ballAcceleration, config.maxBallSpeed);
+                
+                // 根据碰撞位置调整反弹角度
+                const relativeIntersectX = (paddle.x + paddle.width/2) - ball.x;
+                const normalizedRelativeIntersectionX = relativeIntersectX / (paddle.width/2);
+                const bounceAngle = normalizedRelativeIntersectionX * (Math.PI/3); // 最大60度角
+                
+                ball.dx = -Math.sin(bounceAngle) * ball.speed;
+                
+                // 保持球的方向
+                ball.dy = paddle === player1 ? -Math.cos(bounceAngle) * ball.speed : Math.cos(bounceAngle) * ball.speed;
+            }
+            
+            // 绘制游戏
+            function draw() {
+                // 清空画布
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                
+                // 绘制背景
+                const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+                gradient.addColorStop(0, '#e0f2fe');
+                gradient.addColorStop(0.5, '#bae6fd');
+                gradient.addColorStop(1, '#93c5fd');
+                ctx.fillStyle = gradient;
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                // 绘制中线
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect((canvas.width - config.netWidth) / 2, 0, config.netWidth, canvas.height);
+                
+                // 绘制网的纹理
+                ctx.strokeStyle = '#cbd5e1';
+                ctx.lineWidth = 1;
+                const netSpacing = 20;
+                const netOffset = canvas.height % netSpacing;
+                for (let y = netOffset; y < canvas.height; y += netSpacing) {
+                    ctx.beginPath();
+                    ctx.moveTo((canvas.width - config.netWidth) / 2, y);
+                    ctx.lineTo((canvas.width + config.netWidth) / 2, y);
+                    ctx.stroke();
+                }
+                
+                // 绘制玩家1
+                ctx.fillStyle = player1.color;
+                ctx.shadowColor = 'rgba(0, 0, 0, 0.3)';
+                ctx.shadowBlur = 10;
+                ctx.shadowOffsetX = 0;
+                ctx.shadowOffsetY = 4;
+                ctx.beginPath();
+                ctx.roundRect(player1.x, player1.y, player1.width, player1.height, 5);
+                ctx.fill();
+                ctx.shadowBlur = 0;
+                
+                // 绘制玩家2
+                ctx.fillStyle = player2.color;
+                ctx.shadowColor = 'rgba(0, 0, 0, 0.3)';
+                ctx.shadowBlur = 10;
+                ctx.shadowOffsetX = 0;
+                ctx.shadowOffsetY = -4;
+                ctx.beginPath();
+                ctx.roundRect(player2.x, player2.y, player2.width, player2.height, 5);
+                ctx.fill();
+                ctx.shadowBlur = 0;
+                
+                // 绘制球
+                ctx.fillStyle = ball.color;
+                ctx.shadowColor = 'rgba(0, 0, 0, 0.3)';
+                ctx.shadowBlur = 10;
+                ctx.beginPath();
+                ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.shadowBlur = 0;
+                
+                // 如果游戏暂停，显示暂停信息
+                if (gamePaused) {
+                    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+                    ctx.fillRect(canvas.width/2 - 100, canvas.height/2 - 40, 200, 80);
+                    
+                    ctx.fillStyle = 'white';
+                    ctx.font = 'bold 24px Inter, sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('游戏暂停', canvas.width/2, canvas.height/2);
+                    ctx.font = '16px Inter, sans-serif';
+                    ctx.fillText('按空格键继续', canvas.width/2, canvas.height/2 + 30);
+                }
+            }
+            
+            // 游戏主循环
+            function gameLoop(timestamp) {
+                if (!lastTime) lastTime = timestamp;
+                const deltaTime = (timestamp - lastTime) / 16; // 规范化时间步长
+                lastTime = timestamp;
+                
+                update(deltaTime);
+                draw();
+                
+                if (gameRunning) {
+                    animationId = requestAnimationFrame(gameLoop);
+                }
+            }
+            
+            // 更新分数显示
+            function updateScoreDisplay() {
+                player1ScoreEl.textContent = player1.score;
+                player2ScoreEl.textContent = player2.score;
+            }
+            
+            // 检查游戏是否结束
+            function checkGameOver() {
+                if (player1.score >= scoreLimit) {
+                    endGame('玩家1获胜!');
+                } else if (player2.score >= scoreLimit) {
+                    endGame('玩家2获胜!');
+                }
+            }
+            
+            // 结束游戏
+            function endGame(winner) {
+                gameRunning = false;
+                cancelAnimationFrame(animationId);
+                
+                winnerText.textContent = winner;
+                finalScoreText.textContent = `${player1.score} - ${player2.score}`;
+                
+                gameOverScreen.style.display = 'flex';
+            }
+            
+            // 开始游戏
+            function startGame() {
+                // 重置游戏状态
+                player1.score = 0;
+                player2.score = 0;
+                ball.speed = config.ballSpeed;
+                
+                // 更新显示
+                updateScoreDisplay();
+                startScreen.style.display = 'none';
+                gameOverScreen.style.display = 'none';
+                
+                // 开始游戏循环
+                gameRunning = true;
+                gamePaused = false;
+                lastTime = 0;
+                animationId = requestAnimationFrame(gameLoop);
+            }
+            
+            // 暂停/继续游戏
+            function togglePause() {
+                if (!gameRunning) return;
+                
+                gamePaused = !gamePaused;
+                
+                if (gamePaused) {
+                    cancelAnimationFrame(animationId);
+                    pauseButton.innerHTML = '<i class="fa fa-play"></i> 继续';
+                } else {
+                    lastTime = 0;
+                    animationId = requestAnimationFrame(gameLoop);
+                    pauseButton.innerHTML = '<i class="fa fa-pause"></i> 暂停';
+                }
+            }
+            
+            // 事件监听器
+            startButton.addEventListener('click', startGame);
+            restartButton.addEventListener('click', startGame);
+            pauseButton.addEventListener('click', togglePause);
+            
+            // 速度控制
+            speedControl.addEventListener('input', function() {
+                config.speedMultiplier = parseInt(this.value);
+                speedValue.textContent = this.value;
+            });
+            
+            // 分数限制
+            scoreLimitSelect.addEventListener('change', function() {
+                scoreLimit = parseInt(this.value);
+            });
+            
+            // 键盘控制
+            document.addEventListener('keydown', function(e) {
+                if (e.key.toLowerCase() === 'w') keys.w = true;
+                if (e.key.toLowerCase() === 'a') keys.a = true;
+                if (e.key.toLowerCase() === 's') keys.s = true;
+                if (e.key.toLowerCase() === 'd') keys.d = true;
+                if (e.key.toLowerCase() === 'i') keys.i = true;
+                if (e.key.toLowerCase() === 'j') keys.j = true;
+                if (e.key.toLowerCase() === 'k') keys.k = true;
+                if (e.key.toLowerCase() === 'l') keys.l = true;
+                
+                // 空格键暂停/继续
+                if (e.key === ' ') {
+                    togglePause();
+                }
+            });
+            
+            document.addEventListener('keyup', function(e) {
+                if (e.key.toLowerCase() === 'w') keys.w = false;
+                if (e.key.toLowerCase() === 'a') keys.a = false;
+                if (e.key.toLowerCase() === 's') keys.s = false;
+                if (e.key.toLowerCase() === 'd') keys.d = false;
+                if (e.key.toLowerCase() === 'i') keys.i = false;
+                if (e.key.toLowerCase() === 'j') keys.j = false;
+                if (e.key.toLowerCase() === 'k') keys.k = false;
+                if (e.key.toLowerCase() === 'l') keys.l = false;
+            });
+            
+            // 窗口大小调整
+            window.addEventListener('resize', function() {
+                resizeCanvas();
+                // 保持游戏元素在合理位置
+                if (gameRunning) {
+                    player1.x = Math.min(player1.x, canvas.width - player1.width);
+                    player2.x = Math.min(player2.x, canvas.width - player2.width);
+                }
+            });
+            
+            // 初始化游戏
+            initGame();
+        });
+    </script>
+</body>
+</html>
+    
